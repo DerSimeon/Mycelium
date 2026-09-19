@@ -30,6 +30,7 @@ import java.io.SequenceInputStream
 import java.lang.Enum.valueOf
 import java.util.*
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 class ByteMessage(val buf: ByteBuf) {
 
@@ -90,7 +91,7 @@ class ByteMessage(val buf: ByteBuf) {
             result = result or (value shl (SEGMENT_SHIFT * numRead))
 
             numRead++
-            if (numRead > maxReads) {
+            if (numRead > MAX_VARLONG_BYTES) {
                 throw MyceliumReadException("VarLong is too big")
             }
         } while ((read.toInt() and CONTINUE_BIT) != 0)
@@ -125,6 +126,38 @@ class ByteMessage(val buf: ByteBuf) {
      */
     fun writeBoolean(value: Boolean) {
         buf.writeBoolean(value)
+    }
+
+    /**
+     * Reads a minecraft angle (a single byte, 256 steps per full turn) from the buffer.
+     * @return the angle in degrees; note the byte encoding quantises to 256 steps
+     */
+    fun readAngle(): Float {
+        return buf.readByte() * DEGREES_PER_STEP
+    }
+
+    /**
+     * Writes a minecraft angle (a single byte, 256 steps per full turn) to the buffer.
+     * @param value the angle in degrees
+     */
+    fun writeAngle(value: Float) {
+        buf.writeByte((value / DEGREES_PER_STEP).roundToInt())
+    }
+
+    /**
+     * Reads a 1.8 fixed-point coordinate (int = coord * 32) from the buffer.
+     * @return the coordinate as a double
+     */
+    fun readFixedPointInt(): Double {
+        return buf.readInt() / FIXED_POINT_SCALE
+    }
+
+    /**
+     * Writes a 1.8 fixed-point coordinate (int = coord * 32) to the buffer.
+     * @param value the coordinate to write
+     */
+    fun writeFixedPointInt(value: Double) {
+        buf.writeInt(floor(value * FIXED_POINT_SCALE).toInt())
     }
 
     /**
@@ -493,6 +526,90 @@ class ByteMessage(val buf: ByteBuf) {
     }
 
     /**
+     * reads a minecraft block position (packed long) from the buffer.
+     *
+     * The packed field order changed in 1.14: x/z/y since then, x/y/z before.
+     *
+     * @param version the protocol version being read for
+     * @return the position read from the buffer
+     */
+    fun readPosition(version: Version): Position {
+        val value = buf.readLong()
+        // arithmetic shifts sign-extend each field
+        val x = (value shr 38).toInt()
+        return if (version.isAtLeast(Version.MINECRAFT_1_14)) {
+            val z = (value shl 26 shr 38).toInt()
+            val y = (value shl 52 shr 52).toInt()
+            Position(x, y, z)
+        } else {
+            val y = (value shl 26 shr 52).toInt()
+            val z = (value shl 38 shr 38).toInt()
+            Position(x, y, z)
+        }
+    }
+
+    /**
+     * writes a minecraft block position (packed long) to the buffer.
+     *
+     * The packed field order changed in 1.14: x/z/y since then, x/y/z before.
+     *
+     * @param value the position to write
+     * @param version the protocol version being written for
+     */
+    fun writePosition(value: Position, version: Version) {
+        val x = (value.x.toLong() and COORD_26_BITS) shl 38
+        val packed = if (version.isAtLeast(Version.MINECRAFT_1_14)) {
+            x or ((value.z.toLong() and COORD_26_BITS) shl 12) or (value.y.toLong() and COORD_12_BITS)
+        } else {
+            x or ((value.y.toLong() and COORD_12_BITS) shl 26) or (value.z.toLong() and COORD_26_BITS)
+        }
+        buf.writeLong(packed)
+    }
+
+    /**
+     * reads an optional value: a boolean presence flag followed by the value if present.
+     * @param reader reads the value when the presence flag is set
+     * @return the value read, or null if absent
+     */
+    fun <T> readOptional(reader: () -> T): T? {
+        return if (readBoolean()) reader() else null
+    }
+
+    /**
+     * writes an optional value: a boolean presence flag followed by the value if present.
+     * @param value the value to write, or null to write only the absent flag
+     * @param writer writes the value when it is present
+     */
+    fun <T> writeOptional(value: T?, writer: (T) -> Unit) {
+        writeBoolean(value != null)
+        if (value != null) {
+            writer(value)
+        }
+    }
+
+    /**
+     * reads a varInt-length-prefixed list from the buffer.
+     * @param reader reads a single element
+     * @return the list read from the buffer
+     */
+    fun <T> readList(reader: () -> T): List<T> {
+        val length = readVarInt()
+        return List(length) { reader() }
+    }
+
+    /**
+     * writes a varInt-length-prefixed list to the buffer.
+     * @param value the list to write
+     * @param writer writes a single element
+     */
+    fun <T> writeList(value: List<T>, writer: (T) -> Unit) {
+        writeVarInt(value.size)
+        for (i in value) {
+            writer(i)
+        }
+    }
+
+    /**
      * reads a minecraft array from the buffer.
      * @return the minecraft array read from the buffer
      */
@@ -568,7 +685,12 @@ class ByteMessage(val buf: ByteBuf) {
         private const val CONTINUE_BIT = 0x80
         private const val SEGMENT_SHIFT = 7
         private const val MAX_VARINT_BYTES = 5
+        private const val MAX_VARLONG_BYTES = 10
         private const val MAX_BYTES_PER_CHAR = 3
         private const val NAMED_ROOT_HEADER_LENGTH = 3 // TAG_Compound id + 2-byte empty name
+        private const val DEGREES_PER_STEP = 360f / 256f
+        private const val FIXED_POINT_SCALE = 32.0
+        private const val COORD_26_BITS = 0x3FFFFFFL
+        private const val COORD_12_BITS = 0xFFFL
     }
 }
