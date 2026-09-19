@@ -536,14 +536,14 @@ class ByteMessage(val buf: ByteBuf) {
     fun readPosition(version: Version): Position {
         val value = buf.readLong()
         // arithmetic shifts sign-extend each field
-        val x = (value shr 38).toInt()
+        val x = (value shr POSITION_X_SHIFT).toInt()
         return if (version.isAtLeast(Version.MINECRAFT_1_14)) {
-            val z = (value shl 26 shr 38).toInt()
-            val y = (value shl 52 shr 52).toInt()
+            val z = (value shl POSITION_26_BIT_SHIFT shr POSITION_X_SHIFT).toInt()
+            val y = (value shl POSITION_52_BIT_SHIFT shr POSITION_52_BIT_SHIFT).toInt()
             Position(x, y, z)
         } else {
-            val y = (value shl 26 shr 52).toInt()
-            val z = (value shl 38 shr 38).toInt()
+            val y = (value shl POSITION_26_BIT_SHIFT shr POSITION_52_BIT_SHIFT).toInt()
+            val z = (value shl POSITION_X_SHIFT shr POSITION_X_SHIFT).toInt()
             Position(x, y, z)
         }
     }
@@ -557,11 +557,15 @@ class ByteMessage(val buf: ByteBuf) {
      * @param version the protocol version being written for
      */
     fun writePosition(value: Position, version: Version) {
-        val x = (value.x.toLong() and COORD_26_BITS) shl 38
+        val x = (value.x.toLong() and COORD_26_BITS) shl POSITION_X_SHIFT
         val packed = if (version.isAtLeast(Version.MINECRAFT_1_14)) {
-            x or ((value.z.toLong() and COORD_26_BITS) shl 12) or (value.y.toLong() and COORD_12_BITS)
+            x or
+                ((value.z.toLong() and COORD_26_BITS) shl POSITION_12_BIT_SHIFT) or
+                (value.y.toLong() and COORD_12_BITS)
         } else {
-            x or ((value.y.toLong() and COORD_12_BITS) shl 26) or (value.z.toLong() and COORD_26_BITS)
+            x or
+                ((value.y.toLong() and COORD_12_BITS) shl POSITION_26_BIT_SHIFT) or
+                (value.z.toLong() and COORD_26_BITS)
         }
         buf.writeLong(packed)
     }
@@ -692,5 +696,9 @@ class ByteMessage(val buf: ByteBuf) {
         private const val FIXED_POINT_SCALE = 32.0
         private const val COORD_26_BITS = 0x3FFFFFFL
         private const val COORD_12_BITS = 0xFFFL
+        private const val POSITION_X_SHIFT = 38
+        private const val POSITION_26_BIT_SHIFT = 26
+        private const val POSITION_12_BIT_SHIFT = 12
+        private const val POSITION_52_BIT_SHIFT = 52
     }
 }
