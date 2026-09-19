@@ -1,0 +1,13 @@
+# Overrides layered on top of detekt's default rules (buildUponDefaultConfig = true).
+# Only rules that do not fit this project's domain are adjusted here; nothing is disabled.
+style:
+  MagicNumber:
+    # Protocol version numbers in the Version enum are named by their entry
+    # (e.g. MINECRAFT_1_21(767)); the literal is the value, not a magic number.
+    ignoreEnums: true
+
+complexity:
+  TooManyFunctions:
+    # ByteMessage is a protocol codec: one read + one write per wire type, so a
+    # high function count is inherent rather than a design smell.
+    thresholdInClasses: 60

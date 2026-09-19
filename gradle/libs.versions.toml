@@ -1,0 +1,19 @@
+[versions]
+kotlin = "2.4.20"
+shadow = "9.6.1"
+netty = "4.2.18.Final"
+adventure = "5.2.0"
+detekt = "1.23.8"
+mavenPublish = "0.30.0"
+
+[plugins]
+kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }
+
+[libraries]
+netty-buffer = { module = "io.netty:netty-buffer", version.ref = "netty" }
+adventure-nbt = { module = "net.kyori:adventure-nbt", version.ref = "adventure" }
+adventure-text = { module = "net.kyori:adventure-text-serializer-plain", version.ref = "adventure" }
+adventure-gson = { module = "net.kyori:adventure-text-serializer-gson", version.ref = "adventure" }

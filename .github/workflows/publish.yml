@@ -1,0 +1,37 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            25
+            21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Publish to Maven Central
+        env:
+          # The raw secret is masked by GitHub. It is decoded into a shell variable inside this step
+          # and exported only into Gradle's process — never written to GITHUB_ENV, so the decoded
+          # key can never appear in the step's environment dump or logs.
+          SIGNING_KEY_B64: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        # --no-parallel: vanniktech's Central Portal deployment build service is not parallel-safe.
+        # Release version comes from the tag (v1.2.3 -> 1.2.3); the Central Portal rejects SNAPSHOTs.
+        run: |
+          export ORG_GRADLE_PROJECT_signingInMemoryKey="$(printf '%s' "$SIGNING_KEY_B64" | base64 --decode)"
+          ./gradlew publishAndReleaseToMavenCentral \
+            -Pmycelium.version="${GITHUB_REF_NAME#v}" \
+            --no-parallel --no-configuration-cache --stacktrace

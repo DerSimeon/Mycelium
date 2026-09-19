@@ -1,0 +1,9 @@
+### IDEA ###
+.idea/
+
+### GRADLE ###
+.gradle/
+build/
+
+### KOTLIN ###
+.kotlin/
