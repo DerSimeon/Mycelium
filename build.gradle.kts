@@ -11,7 +11,7 @@ plugins {
 
 group = "lol.simeon"
 // Release version comes from the publish tag (v1.2.3 -> 1.2.3); the Central Portal rejects SNAPSHOTs.
-version = providers.gradleProperty("mycelium.version").orElse("1.0.0").get()
+version = providers.gradleProperty("mycelium.version").orElse("1.0.1").get()
 
 repositories {
     mavenCentral()

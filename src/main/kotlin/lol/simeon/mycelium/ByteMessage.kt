@@ -68,15 +68,63 @@ class ByteMessage(val buf: ByteBuf) {
      * @param value the varInt to write to the buffer
      */
     fun writeVarInt(value: Int) {
-        if (value < 0) {
-            throw MyceliumWriteException("VarInt cannot be negative")
-        }
         var remaining = value
         while ((remaining and SEGMENT_BITS.inv()) != 0) {
             buf.writeByte((remaining and SEGMENT_BITS) or CONTINUE_BIT)
             remaining = remaining ushr SEGMENT_SHIFT
         }
         buf.writeByte(remaining)
+    }
+
+    /**
+     * Reads a minecraft varLong from the buffer.
+     * @return the varLong read from the buffer
+     */
+    fun readVarLong(): Long {
+        var numRead = 0
+        var result: Long = 0
+        var read: Byte
+        do {
+            read = buf.readByte()
+            val value = read.toLong() and SEGMENT_BITS.toLong()
+            result = result or (value shl (SEGMENT_SHIFT * numRead))
+
+            numRead++
+            if (numRead > maxReads) {
+                throw MyceliumReadException("VarLong is too big")
+            }
+        } while ((read.toInt() and CONTINUE_BIT) != 0)
+
+        return result
+    }
+
+    /**
+     * Writes a minecraft varLong to the buffer.
+     * @param value the varLong to write to the buffer
+     */
+    fun writeVarLong(value: Long) {
+        var remaining = value
+        while ((remaining and SEGMENT_BITS.toLong().inv()) != 0L) {
+            buf.writeByte((remaining and SEGMENT_BITS.toLong() or CONTINUE_BIT.toLong()).toInt())
+            remaining = remaining ushr SEGMENT_SHIFT
+        }
+        buf.writeByte(remaining.toInt())
+    }
+
+    /**
+     * Reads a minecraft boolean from the buffer.
+     * @return the boolean read from the buffer
+     */
+    fun readBoolean(): Boolean {
+        return buf.readBoolean()
+    }
+
+    /**
+     * Writes a minecraft boolean to the buffer.
+     * @param value the boolean to write to the buffer
+     */
+    fun writeBoolean(value: Boolean) {
+        buf.writeBoolean(value)
     }
 
     /**
