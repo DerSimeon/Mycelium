@@ -17,6 +17,7 @@ enum class Version(val protocol: Int) {
     MINECRAFT_1_10(210),
     MINECRAFT_1_11(315),
     MINECRAFT_1_12(335),
+    MINECRAFT_1_12_2(340), // Keep Alive payload switched VarInt -> Long here
     MINECRAFT_1_13(393),
     MINECRAFT_1_14(477),
     MINECRAFT_1_15(573),
