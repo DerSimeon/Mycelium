@@ -205,6 +205,21 @@ class ByteMessageTest {
         assertTrue(!old.contentEquals(new), "pre/post 1.14 packings should differ")
     }
 
+    @Test
+    fun `position packs the spec bit layout`() {
+        // 1.14+: x(26) z(26) y(12)
+        val new = msg().apply { writePosition(Position(1, 2, 3), Version.MINECRAFT_1_14) }
+        assertEquals((1L shl 38) or (3L shl 12) or 2L, new.buf.readLong())
+        // pre-1.14: x(26) y(12) z(26)
+        val old = msg().apply { writePosition(Position(1, 2, 3), Version.MINECRAFT_1_13) }
+        assertEquals((1L shl 38) or (2L shl 26) or 3L, old.buf.readLong())
+    }
+
+    @Test
+    fun `position encodes to eight bytes`() {
+        assertEquals(8, msg().apply { writePosition(Position(1, 2, 3), Version.MINECRAFT_1_14) }.toByteArray().size)
+    }
+
     // --- optional ---
 
     @Test
@@ -219,6 +234,19 @@ class ByteMessageTest {
         }
     }
 
+    @Test
+    fun `optional absent writes only the presence flag`() {
+        val bytes = msg().apply { writeOptional<String>(null) { writeString(it) } }.toByteArray()
+        assertContentEquals(byteArrayOf(0), bytes)
+    }
+
+    @Test
+    fun `optional nests`() {
+        val m = msg()
+        m.writeOptional(Position(1, 2, 3)) { m.writePosition(it, Version.MINECRAFT_1_14) }
+        assertEquals(Position(1, 2, 3), m.readOptional { m.readPosition(Version.MINECRAFT_1_14) })
+    }
+
     // --- list ---
 
     @Test
@@ -227,6 +255,21 @@ class ByteMessageTest {
         val m = msg()
         m.writeList(value) { m.writeVarInt(it) }
         assertEquals(value, m.readList { m.readVarInt() })
+    }
+
+    @Test
+    fun `empty list roundtrips as a single length byte`() {
+        val m = msg()
+        m.writeList(emptyList<String>()) { m.writeString(it) }
+        assertContentEquals(byteArrayOf(0), m.toByteArray())
+    }
+
+    @Test
+    fun `list of strings roundtrips`() {
+        val value = listOf("a", "", "unicode ✓")
+        val m = msg()
+        m.writeList(value) { m.writeString(it) }
+        assertEquals(value, m.readList { m.readString() })
     }
 
     // --- primitives / arrays ---
